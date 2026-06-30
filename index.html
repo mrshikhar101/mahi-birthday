@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mahi</title>
+    
+    <!-- Design & Typography Engines -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Motion Engines -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#030303',
+                            card: 'rgba(255, 255, 255, 0.02)',
+                            border: 'rgba(255, 255, 255, 0.07)',
+                            accent: '#FCD34D'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #030303;
+            color: #F4F4F5;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030303;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .premium-glass {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 24px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        .text-glow {
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+        }
+
+        /* Perspective for premium 3D flips */
+        .perspective-container {
+            perspective: 1200px;
+        }
+        
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-style: preserve-3d;
+        }
+        
+        .flip-card:hover .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1.5rem;
+        }
+        
+        .flip-card-back {
+            transform: rotateY(180deg);
+        }
+
+        /* Easter egg styling */
+        .easter-toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(252, 211, 77, 0.3);
+            color: #FCD34D;
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            z-index: 100;
+            font-family: monospace;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+
+        .ripple-effect {
+            position: absolute;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: scale(0);
+            animation: ripple-animation 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="selection:bg-white/10 selection:text-white">
+
+    <!-- ELITE CINEMATIC LOADER -->
+    <div id="loader" class="fixed inset-0 bg-[#030303] z-50 flex flex-col justify-center items-center font-sans">
+        <div class="w-full max-w-sm px-6">
+            <div id="loader-terminal" class="space-y-3 font-mono text-xs tracking-wider text-zinc-500 mb-8">
+                <!-- Content handled natively in Javascript -->
+            </div>
+            <div class="h-[1px] w-full bg-zinc-900 overflow-hidden relative rounded-full">
+                <div id="loader-progress" class="absolute top-0 left-0 h-full w-0 bg-zinc-400 transition-all duration-300 ease-out"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WHITE FLASH ELEMENT -->
+    <div id="flash" class="fixed inset-0 bg-white z-40 opacity-0 pointer-events-none mix-blend-overlay"></div>
+
+    <!-- AMBIENT ELEGANT BACKGROUND CANVAS -->
+    <canvas id="ambientCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+    <!-- FLOATING GRADIENT GLOWS -->
+    <div class="fixed top-[-20%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-purple-900/5 blur-[140px] pointer-events-none z-0"></div>
+    <div class="fixed bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-amber-900/5 blur-[140px] pointer-events-none z-0"></div>
+
+    <!-- TINY EASTER EGG DUCK -->
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 10%; left: -50px;" data-speed="0.5" data-delay="5000">🐥</div>
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 22%; left: -50px;" data-speed="0.35" data-delay="9000">🐥</div>
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 38%; left: -50px;" data-speed="0.65" data-delay="2000">🐥</div>
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 55%; left: -50px;" data-speed="0.45" data-delay="13000">🐥</div>
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 70%; left: -50px;" data-speed="0.55" data-delay="6500">🐥</div>
+    <div class="easter-duck fixed z-30 pointer-events-auto cursor-help text-xl select-none opacity-40 hover:opacity-100 transition-opacity duration-300" style="bottom: 85%; left: -50px;" data-speed="0.4" data-delay="11000">🐥</div>
+
+    <!-- EASTER EGG TOAST NOTIFICATION -->
+    <div id="easter-toast" class="easter-toast"></div>
+
+
+    <!-- MAIN EXPERIENCE MATRIX -->
+    <div id="main-canvas" class="opacity-0 relative z-10">
+
+        <!-- 1. HERO ARCHITECTURE -->
+        <section class="min-h-screen flex flex-col justify-center items-center text-center px-6 relative" id="hero-section">
+            <div class="premium-glass px-8 py-12 md:pt-24 md:pb-20 md:px-20 rounded-[2.5rem] max-w-4xl w-full mx-auto relative overflow-hidden group transition-all duration-700 hover:border-white/15 dynamic-layer">
+                <div class="absolute inset-0 bg-gradient-to-tr from-white/[0.01] via-transparent to-white/[0.03] pointer-events-none"></div>
+                
+                <!-- Premium Quadrilateral Corner Photo Container -->
+                <div class="relative md:absolute md:top-6 md:right-6 mx-auto md:mx-0 mb-8 md:mb-0 w-32 h-32 md:w-44 md:h-44 transition-all duration-700 group-hover:scale-[1.03] filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.7)]"
+                     style="clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 85%);">
+                    <div class="w-full h-full bg-zinc-900/50 relative overflow-hidden border border-white/10">
+                        <img src="image/photo2.png" alt="Holding Flower" class="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-all duration-700 ease-out scale-110 group-hover:scale-100">
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40"></div>
+                    </div>
+                </div>
+
+                <h1 id="hero-title" class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 bg-gradient-to-b from-zinc-100 via-zinc-200 to-zinc-500 bg-clip-text text-transparent text-glow select-none cursor-pointer active:scale-[0.99] transition-transform md:pr-32 md:text-left">
+                    Happy Birthday, Mahi. 🐥
+                </h1>
+                
+                <div class="h-[1px] w-24 bg-gradient-to-r from-transparent via-zinc-600 to-transparent md:mx-0 mb-8"></div>
+                
+                <p class="text-zinc-400 text-lg md:text-xl font-light tracking-wide max-w-xl md:text-left font-serif italic leading-relaxed">
+                    "Today is just a reminder that the world gave me my KING 👑 a little while ago." 
+                </p>
+            </div>
+            <div class="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 text-xs uppercase tracking-[0.3em] font-medium text-zinc-500">
+                <span>Scroll Down</span>
+                <div class="w-[1px] h-8 bg-gradient-to-b from-zinc-500 to-transparent mt-1 animate-pulse"></div>
+            </div>
+        </section>
+
+
+        <!-- 2. BEFORE TODAY (SCROLL-BASED DEPTH CARDS) -->
+        <section class="min-h-screen flex flex-col justify-center items-center px-6 py-32 relative" id="depth-section">
+            <div class="max-w-5xl w-full">
+                <p class="text-xs uppercase tracking-[0.4em] font-semibold text-zinc-500 text-center mb-4">The Timeline</p>
+                <h2 class="text-3xl md:text-4xl font-light font-serif italic text-center mb-20 text-zinc-300">Before today...</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative" id="depth-cards-container">
+                    <div class="premium-glass p-8 rounded-2xl text-left transform-gpu border-t-white/15 shadow-2xl flex flex-col justify-between h-64 group hover:bg-white/[0.04] transition-colors duration-500">
+                        <span class="text-zinc-600 font-mono text-sm tracking-wider">01 // TRACK</span>
+                        <div>
+                            <h3 class="text-3xl font-light text-zinc-100 tracking-tight mb-2 font-serif">668 Days</h3>
+                            <p class="text-zinc-400 text-sm leading-relaxed">Of unmatched personal chaos and perfectly shared sanity.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="premium-glass p-8 rounded-2xl text-left transform-gpu border-t-white/15 shadow-2xl flex flex-col justify-between h-64 group hover:bg-white/[0.04] transition-colors duration-500">
+                        <span class="text-zinc-600 font-mono text-sm tracking-wider">02 // ARCHIVE</span>
+                        <div>
+                            <h3 class="text-3xl font-light text-zinc-100 tracking-tight mb-2 font-serif">Countless</h3>
+                            <p class="text-zinc-400 text-sm leading-relaxed">Inside jokes that would make absolutely zero sense to the rest of the universe.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="premium-glass p-8 rounded-2xl text-left transform-gpu border-t-white/15 shadow-2xl flex flex-col justify-between h-64 group hover:bg-white/[0.04] transition-colors duration-500">
+                        <span class="text-zinc-600 font-mono text-sm tracking-wider">03 // FLOW</span>
+                        <div>
+                            <h3 class="text-3xl font-light text-zinc-100 tracking-tight mb-2 font-serif">Random</h3>
+                            <p class="text-zinc-400 text-sm leading-relaxed">Late-night philosophy mixed beautifully with completely unfiltered nonsense.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="premium-glass p-8 rounded-2xl text-left transform-gpu border-t-white/15 shadow-2xl flex flex-col justify-between h-64 group hover:bg-white/[0.04] transition-colors duration-500">
+                        <span class="text-zinc-600 font-mono text-sm tracking-wider">04 // CORE</span>
+                        <div>
+                            <h3 class="text-3xl font-light text-zinc-100 tracking-tight mb-2 font-serif">One</h3>
+                            <p class="text-zinc-400 text-sm leading-relaxed">Remarkably patient soul. (And yes, I am mostly talking about myself here).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 3. PHOTO GALLERY (PREMIUM ASYMMETRICAL EDITORIAL - 4 CARDS ONLY) -->
+        <section class="min-h-screen flex flex-col justify-center items-center px-6 py-32 bg-[#050505]/40 relative">
+            <div class="max-w-6xl w-full">
+                <div class="text-center mb-24">
+                    <p class="text-xs uppercase tracking-[0.4em] font-semibold text-zinc-500 mb-4">Visual Archives</p>
+                    <h2 class="text-3xl md:text-5xl font-light font-serif italic text-zinc-200">Collected Frames</h2>
+                </div>
+
+                <!-- Asymmetric Editorial Grid Layout -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center" id="gallery-grid">
+                    
+                    <!-- Frame 1 -->
+                    <div class="md:col-span-5 transform transition-transform duration-700 hover:z-20">
+                        <div class="premium-glass p-3 rounded-[1.8rem] -rotate-2 hover:rotate-0 transition-all duration-500 group shadow-2xl">
+                            <div class="overflow-hidden rounded-2xl aspect-[4/5] bg-zinc-900 relative">
+                                <img src="image/photo1.png" alt="Frame Archive 1" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                            </div>
+                            <p class="font-serif italic text-zinc-400 text-sm mt-4 px-2 py-1">Guess hwa kiski wajah se chal rhi rhi thi, you gussed it wrong meri wajah se 😌</p>
+                        </div>
+                    </div>
+
+                    <!-- Frame 2 -->
+                    <div class="md:col-span-7 transform transition-transform duration-700 hover:z-20 md:translate-y-12">
+                        <div class="premium-glass p-3 rounded-[1.8rem] rotate-1 hover:rotate-0 transition-all duration-500 group shadow-2xl">
+                            <div class="overflow-hidden rounded-2xl aspect-[16/10] bg-zinc-900 relative">
+                                <img src="image/photo4.jpg" alt="Frame Archive 2" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                            </div>
+                            <p class="font-serif italic text-zinc-400 text-sm mt-4 px-2 py-1">Chal chal you are not that shy at all</p>
+                        </div>
+                    </div>
+
+                    <!-- Frame 3 -->
+                    <div class="md:col-span-7 transform transition-transform duration-700 hover:z-20 md:mt-16">
+                        <div class="premium-glass p-3 rounded-[1.8rem] -rotate-1 hover:rotate-0 transition-all duration-500 group shadow-2xl">
+                            <div class="overflow-hidden rounded-2xl aspect-[16/11] bg-zinc-900 relative">
+                                <img src="image/photo3.png" alt="Frame Archive 3" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                            </div>
+                            <p class="font-serif italic text-zinc-400 text-sm mt-4 px-2 py-1">Somewhere between serious and completely lost</p>
+                        </div>
+                    </div>
+
+                    <!-- Frame 4 -->
+                    <div class="md:col-span-5 transform transition-transform duration-700 hover:z-20 md:mt-24 md:-translate-x-8">
+                        <div class="premium-glass p-3 rounded-[1.8rem] rotate-3 hover:rotate-0 transition-all duration-500 group shadow-2xl">
+                            <div class="overflow-hidden rounded-2xl aspect-[4/3] bg-zinc-900 relative">
+                                <img src="image/photo5.jpg" alt="Frame Archive 4" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 ease-out">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                            </div>
+                            <p class="font-serif italic text-zinc-400 text-sm mt-4 px-2 py-1">Waiting for next winter.... and next random night drive 🌙</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 4. THINGS I KNOW ABOUT YOU (PREMIUM 3D INTEGRITY FLIPS) -->
+        <section class="min-h-screen flex flex-col justify-center items-center px-6 py-32 bg-[#040404]">
+            <div class="max-w-5xl w-full">
+                <div class="text-center mb-24">
+                    <p class="text-xs uppercase tracking-[0.4em] font-semibold text-zinc-500 mb-4">The Blueprints</p>
+                    <h2 class="text-3xl md:text-4xl font-light font-serif italic text-zinc-200">Things I Know About You</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 perspective-container">
+                    
+                    <!-- Card 1 -->
+                    <div class="flip-card h-72 cursor-pointer group">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front premium-glass p-8 flex flex-col justify-center items-center text-center transition-all duration-500 group-hover:border-zinc-700">
+                                <div class="text-5xl mb-4 transition-transform duration-500 group-hover:scale-110 id-waffle-icon">🧇</div>
+                                <span class="text-xs tracking-widest uppercase font-mono text-zinc-500">Manifesto 01</span>
+                            </div>
+                            <div class="flip-card-back bg-gradient-to-br from-amber-950/20 to-neutral-900/40 border border-amber-500/20 p-8 flex flex-col justify-center items-center text-center">
+                                <p class="text-amber-200 font-serif italic text-lg leading-relaxed">
+                                    Kunafa, waffles are absolutely non-negotiable. They are a binding legal requirement for your survival and now became mine too
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="flip-card h-72 cursor-pointer group">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front premium-glass p-8 flex flex-col justify-center items-center text-center transition-all duration-500 group-hover:border-zinc-700">
+                                <div class="text-5xl mb-4 transition-transform duration-500 group-hover:scale-110">😭</div>
+                                <span class="text-xs tracking-widest uppercase font-mono text-zinc-500">Manifesto 02</span>
+                            </div>
+                            <div class="flip-card-back bg-gradient-to-br from-zinc-800/30 to-zinc-950/50 border border-white/10 p-8 flex flex-col justify-center items-center text-center">
+                                <p class="text-zinc-200 font-serif italic text-lg leading-relaxed">
+                                    Your official lifetime quota for saying "Thank you" was permanently exhausted somewhere around mid-2024 and cannot say everytime that thank tu rakhle aur you mein 
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="flip-card h-72 cursor-pointer group">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front premium-glass p-8 flex flex-col justify-center items-center text-center transition-all duration-500 group-hover:border-zinc-700">
+                                <div class="text-5xl mb-4 transition-transform duration-500 group-hover:scale-110">🐥</div>
+                                <span class="text-xs tracking-widest uppercase font-mono text-zinc-500">Manifesto 03</span>
+                            </div>
+                            <div class="flip-card-back bg-gradient-to-br from-purple-950/20 to-neutral-900/40 border border-purple-500/20 p-8 flex flex-col justify-center items-center text-center">
+                                <p class="text-purple-200 font-serif italic text-lg leading-relaxed">
+                                    A highly decorated, certified professional overthinker. Every basic scenario requires alternative timelines.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 4 -->
+                    <div class="flip-card h-72 cursor-pointer group md:col-span-1">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front premium-glass p-8 flex flex-col justify-center items-center text-center transition-all duration-500 group-hover:border-zinc-700">
+                                <div class="text-5xl mb-4 transition-transform duration-500 group-hover:scale-110">😂</div>
+                                <span class="text-xs tracking-widest uppercase font-mono text-zinc-500">Manifesto 04</span>
+                            </div>
+                            <div class="flip-card-back bg-gradient-to-br from-blue-950/20 to-neutral-900/40 border border-blue-500/20 p-8 flex flex-col justify-center items-center text-center">
+                                <p class="text-blue-200 font-serif italic text-lg leading-relaxed">
+                                    Possesses the unique superpower to dismantle any completely serious, logical conversation into "ek chata marungi naa"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 5 (Wide) -->
+                    <div class="flip-card h-72 cursor-pointer group md:col-span-2">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front premium-glass p-8 flex flex-col justify-center items-center text-center transition-all duration-500 group-hover:border-zinc-700">
+                                <div class="text-5xl mb-4 transition-transform duration-500 group-hover:scale-110">🌞</div>
+                                <span class="text-xs tracking-widest uppercase font-mono text-zinc-500">Manifesto 05</span>
+                            </div>
+                            <div class="flip-card-back bg-gradient-to-br from-emerald-950/20 to-neutral-900/40 border border-emerald-500/20 p-8 flex flex-col justify-center items-center text-center">
+                                <p class="text-emerald-200 font-serif italic text-lg leading-relaxed">
+                                    "5:00 AM sharp uthunge aaj." <br>
+                                    <span class="text-xs text-zinc-500 font-sans tracking-wide block mt-2">(Said with absolute global conviction, followed by absolute uninterrupted sleep.)</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 5. HIDDEN MEMORY MATRIX -->
+        <section class="min-h-screen flex flex-col justify-center items-center px-6 py-32 relative overflow-hidden">
+            <div class="max-w-2xl w-full relative z-10 space-y-4">
+                <div class="text-center mb-16">
+                    <p class="text-xs uppercase tracking-[0.4em] font-semibold text-zinc-500 mb-4">Static Fragments</p>
+                    <h2 class="text-3xl md:text-4xl font-light font-serif italic text-zinc-300">Flashbacks</h2>
+                </div>
+                
+                <div class="memory-node opacity-0 transform translate-y-6 flex items-center gap-6 premium-glass p-5 rounded-2xl group hover:bg-white/[0.03] transition-colors duration-500">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center font-mono text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">01</div>
+                    <p class="text-zinc-300 tracking-wide text-sm font-light">The vintage thinking where choosing a flavor took longer than the actual walk.</p>
+                </div>
+
+                <div class="memory-node opacity-0 transform translate-y-6 flex items-center gap-6 premium-glass p-5 rounded-2xl group hover:bg-white/[0.03] transition-colors duration-500">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center font-mono text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">02</div>
+                    <p class="text-zinc-300 tracking-wide text-sm font-light">Overcomplicating simple plans until they resembled heavy strategic military logistics.</p>
+                </div>
+
+                <div class="memory-node opacity-0 transform translate-y-6 flex items-center gap-6 premium-glass p-5 rounded-2xl group hover:bg-white/[0.03] transition-colors duration-500">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center font-mono text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">03</div>
+                    <p class="text-zinc-300 tracking-wide text-sm font-light">Completely random, unprompted late-night "oye kkrh" check-ins that secretly anchor rough weeks.</p>
+                </div>
+
+                <div class="memory-node opacity-0 transform translate-y-6 flex items-center gap-6 premium-glass p-5 rounded-2xl group hover:bg-white/[0.03] transition-colors duration-500">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center font-mono text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">04</div>
+                    <p class="text-zinc-300 tracking-wide text-sm font-light">Panic right before exams that somehow becomes soo easy just by a all the best .</p>
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- 6. THE DANGEROUS POETIC SEGMENT -->
+        <section class="min-h-screen bg-black flex flex-col justify-center items-center text-center px-6 relative">
+            <div class="space-y-12 max-w-3xl relative z-10">
+                <p class="cinematic-line opacity-0 transform translate-y-4 text-xl md:text-3xl text-zinc-500 font-light tracking-wide font-sans">
+                    Some people become memories.
+                </p>
+                <p class="cinematic-line opacity-0 transform translate-y-4 text-xl md:text-3xl text-zinc-500 font-light tracking-wide font-sans">
+                    Some become habits.
+                </p>
+                <p class="cinematic-line opacity-0 transform translate-y-8 text-2xl md:text-4xl font-serif text-amber-200/90 italic font-medium tracking-wide text-glow">
+                    You're somewhere beautifully in between. ❤️
+                </p>
+            </div>
+            <!-- Subdued lines accenting depth -->
+            <div class="absolute inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-800 to-transparent top-1/4"></div>
+            <div class="absolute inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-800 to-transparent bottom-1/4"></div>
+        </section>
+
+
+        <!-- 7. INTERACTIVE COGNITION MATRIX (BUTTON & COUNTER) -->
+        <section id="shake-container" class="min-h-screen flex flex-col justify-center items-center px-6 text-center relative transition-transform duration-100 ease-out">
+            <div class="relative z-10 max-w-xl">
+                <button id="ripple-trigger" class="premium-glass px-10 py-5 rounded-full text-sm font-medium tracking-[0.2em] uppercase text-zinc-300 hover:text-white hover:bg-white/[0.03] hover:border-white/20 transition-all duration-300 active:scale-[0.97] relative overflow-hidden group">
+                    <span class="absolute inset-0 bg-gradient-to-r from-zinc-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+                    Click only if you're smiling. 🙂
+                </button>
+                
+                <!-- ADVANCED DATA CONSOLE COUNTER -->
+                <div id="counter-console" class="mt-24 opacity-0 transform scale-95 transition-all duration-1000 ease-out">
+                    <p class="text-zinc-500 font-sans font-light tracking-wide text-sm">
+                        Data metrics confirm you have officially stated <span class="text-zinc-300 font-serif italic">"Thank you"</span> approximately
+                    </p>
+                    <div class="my-6 relative inline-block">
+                        <h3 id="ticker" class="text-5xl md:text-7xl font-mono font-bold tracking-tight bg-gradient-to-b from-amber-200 to-yellow-500 bg-clip-text text-transparent text-glow">
+                            0
+                        </h3>
+                    </div>
+                    <p class="text-zinc-500 font-sans font-light tracking-wide text-sm">
+                        times without any structural necessity.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 8. THE SURPRISE DIGITAL ENVELOPE ARCHITECTURE -->
+        <section class="min-h-screen flex flex-col justify-center items-center px-6 bg-[#040404] relative">
+            <div class="max-w-md w-full relative z-10">
+                <div class="text-center mb-16">
+                    <p class="text-xs uppercase tracking-[0.4em] font-semibold text-zinc-500 mb-3"></p>
+                    <h2 class="text-2xl font-light font-serif italic text-zinc-400">A little something...</h2>
+                </div>
+                
+                <!-- Premium Modular Envelope System -->
+                <div id="envelope-wrapper" class="w-full h-64 bg-zinc-900/60 rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.8)] relative cursor-pointer border border-zinc-800/80 overflow-hidden flex items-center justify-center group transition-all duration-500 hover:border-zinc-700">
+                    <div id="envelope-prompt" class="text-zinc-400 font-sans text-xs tracking-[0.25em] uppercase group-hover:text-zinc-200 transition-colors flex flex-col items-center gap-3">
+                        <span class="text-2xl animate-pulse">✉️</span>
+                        <span>Open Document</span>
+                    </div>
+                    
+                    <!-- Sliding Paper Engine -->
+                    <div id="letter-node" class="absolute inset-x-4 top-full bg-gradient-to-b from-zinc-100 to-white text-zinc-900 p-8 rounded-t-xl transition-all duration-700 ease-out max-h-[22rem] overflow-y-auto shadow-2xl border border-white/20">
+                        <div class="w-8 h-[2px] bg-zinc-300 mx-auto mb-6 rounded-full"></div>
+                        <p class="font-serif italic text-sm text-zinc-800 leading-relaxed space-y-4">
+                            Mahi,<br><br>
+                            Pata nhi birthday letter mein exactly kya likhte hain, aur tu toh jaanti hi hai meri English bhi itni khaas nhi hai. 😭<br><br>
+                            Bas itna bolna tha ki thank you... genuinely. Pichle 668 days mein bahut random conversations hui, late night rides hui, DRDO wali story, aur beech beech mein tere hazaar "thank you" bhi sunne mile. 😂<br><br>
+                            Tu shayad notice bhi na kare, but whenever we meet ya baat hoti hai, din thoda better ho hi jata hai atleast mera toh jata hii hein. Tu un logon mein se hai jinke saath kuch extraordinary karna zaroori nhi hota. Kabhi kabhi sirf ek baithak bhi enough hota hai but iska matlab ye mat samajna kii enough hein ek se jyada baithak kii jarurat hein atleast 1-2 per week. 🐥<br><br>
+                            Aur ek baat jo shayad maine kabhi directly boli nahi... I really want to see you achieve every single dream you've ever talked about, tujhse bhi zyada. career ho, ya life ka koi bhi goal... I know tu kar legi. Bas kabhi apne dreams ke saath compromise mat karna.<br><br>
+                            Baaki... meetha thoda jyada khaya kar 😭<br><br>
+                            Hamesha aise hi rehna<br><br>
+                            Happy Birthday Myy KING 👑🐥.<br><br>
+                            <span class="font-sans text-xs uppercase tracking-widest font-semibold text-zinc-500 block mt-4">— Shikhar</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 9. CLASSY MINIMALIST OUTRO -->
+        <section class="min-h-screen bg-black flex flex-col justify-center items-center text-center px-6 relative">
+            <div class="space-y-6 max-w-4xl">
+                <h1 class="outro-text opacity-0 transform translate-y-4 text-4xl md:text-7xl font-bold tracking-tight text-zinc-300 font-sans">
+                    Stay happy.
+                </h1>
+                <h1 class="outro-text opacity-0 transform translate-y-4 text-4xl md:text-7xl font-bold tracking-tight text-zinc-400 font-sans">
+                    Stay weird.
+                </h1>
+                <h1 class="outro-text opacity-0 transform translate-y-4 text-4xl md:text-7xl font-bold tracking-tight text-zinc-200 font-sans">
+                    Stay exactly the way you are.
+                </h1>
+            </div>
+            
+            <div class="mt-24 opacity-0 id-final-sig transform translate-y-4">
+                <p class="text-zinc-600 tracking-[0.4em] text-xs uppercase mb-3 font-mono">Closing Note</p>
+                <h2 class="text-4xl font-light font-serif italic text-zinc-400">Happy Birthday.</h2>
+            </div>
+        </section>
+
+    </div>
+
+
+    <!-- ADVANCED CORE ENGINE CODE ARCHITECTURE -->
+    <script>
+        // INIT SCROLL TRIGGER
+        gsap.registerPlugin(ScrollTrigger);
+
+        // 1. ADVANCED TERMINAL SEQUENCE LOADER
+        const terminalLogs = [
+            "Initializing operational matrix...",
+            "Searching core databases for subject: Mahi...",
+            "Locating missing caffeine & waffle metrics...",
+            "Parsing 365 days of structural chaos...",
+            "Subject located with optimal precision.",
+            "Decompressing memory containers...",
+            "Ready."
+        ];
+        
+        const terminalNode = document.getElementById("loader-terminal");
+        const progressNode = document.getElementById("loader-progress");
+        let logIndex = 0;
+
+        function renderLogs() {
+            if (logIndex < terminalLogs.length) {
+                const line = document.createElement("p");
+                line.className = "animate-pulse";
+                line.innerHTML = `> ${terminalLogs[logIndex]}`;
+                terminalNode.appendChild(line);
+                
+                // Track progress line dynamically
+                logIndex++;
+                progressNode.style.width = `${(logIndex / terminalLogs.length) * 100}%`;
+                
+                setTimeout(renderLogs, 450 + Math.random() * 200);
+            } else {
+                // Execute cinematic entry flash sequence
+                setTimeout(() => {
+                    gsap.to("#flash", { opacity: 0.8, duration: 0.1, yoyo: true, repeat: 1, onComplete: () => {
+                        gsap.to("#loader", { opacity: 0, duration: 1, ease: "power4.inOut", onComplete: () => {
+                            document.getElementById("loader").style.display = "none";
+                            gsap.to("#main-canvas", { opacity: 1, duration: 1.5, ease: "power3.out" });
+                            executeGlobalMotionTriggers();
+                        }});
+                    }});
+                }, 400);
+            }
+        }
+        window.addEventListener('DOMContentLoaded', renderLogs);
+
+
+        // 2. AMBIENT BACKGROUND SYSTEM (ELEGANT LOW-OPACITY STARS & EMBER DUST)
+        const canvas = document.getElementById("ambientCanvas");
+        const ctx = canvas.getContext("2d");
+        let particlesArray = [];
+        
+        function setCanvasDimensions() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", setCanvasDimensions);
+        setCanvasDimensions();
+
+        class ParticleAsset {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.radius = Math.random() * 1.5 + 0.2;
+                this.alpha = Math.random() * 0.2 + 0.05;
+                this.velocity = Math.random() * 0.3 + 0.05;
+                this.directionX = Math.random() * 0.2 - 0.1;
+            }
+            update() {
+                this.y -= this.velocity;
+                this.x += this.directionX;
+                if (this.y < 0) {
+                    this.y = canvas.height;
+                    this.x = Math.random() * canvas.width;
+                }
+                if (this.x < 0 || this.x > canvas.width) {
+                    this.directionX = -this.directionX;
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = "#FFFFFF";
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "#FCD34D";
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        for (let i = 0; i < 75; i++) {
+            particlesArray.push(new ParticleAsset());
+        }
+
+        function runBackgroundEngine() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particlesArray.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(runBackgroundEngine);
+        }
+        runBackgroundEngine();
+
+
+        // 3. MOUSE INTERACTION RESPONSIVE DEPTH
+        document.addEventListener("mousemove", (e) => {
+            const targets = document.querySelectorAll(".dynamic-layer");
+            const xOffset = (window.innerWidth / 2 - e.clientX) / 45;
+            const yOffset = (window.innerHeight / 2 - e.clientY) / 45;
+            targets.forEach(target => {
+                target.style.transform = `rotateY(${xOffset}deg) rotateX(${-yOffset}deg)`;
+            });
+        });
+
+
+        // 4. CORE SCROLL-BASED CINEMATIC SEQUENCE MAPS
+        function executeGlobalMotionTriggers() {
+            // Rotating cards scrub architecture
+            gsap.from(".rotate-card", {
+                scrollTrigger: {
+                    trigger: "#depth-cards-container",
+                    start: "top 85%",
+                    end: "bottom 50%",
+                    scrub: 1.2,
+                },
+                rotate: () => Math.random() * 16 - 8,
+                y: 80,
+                opacity: 0,
+                stagger: 0.15,
+                ease: "power2.out"
+            });
+
+            // Asymmetric Gallery Grid Reveal
+            gsap.from("#gallery-grid > div", {
+                scrollTrigger: {
+                    trigger: "#gallery-grid",
+                    start: "top 80%",
+                },
+                y: 100,
+                opacity: 0,
+                stagger: 0.2,
+                duration: 1.4,
+                ease: "power4.out"
+            });
+
+            // Memory Nodes Staggered Inward Flow
+            gsap.to(".memory-node", {
+                scrollTrigger: {
+                    trigger: ".memory-node",
+                    start: "top 80%",
+                },
+                opacity: 1,
+                y: 0,
+                stagger: 0.25,
+                duration: 1.2,
+                ease: "power3.out"
+            });
+
+            // Deep Poetic Line Reveals
+            gsap.to(".cinematic-line", {
+                scrollTrigger: {
+                    trigger: ".cinematic-line",
+                    start: "top 75%",
+                },
+                opacity: 1,
+                y: 0,
+                stagger: 1.4,
+                duration: 2,
+                ease: "expo.out"
+            });
+
+            // Outro Final Layout Transitions
+            gsap.to(".outro-text", {
+                scrollTrigger: {
+                    trigger: ".outro-text",
+                    start: "top 80%",
+                },
+                opacity: 1,
+                y: 0,
+                stagger: 0.4,
+                duration: 1.4,
+                ease: "power4.out"
+            });
+
+            gsap.to(".id-final-sig", {
+                scrollTrigger: {
+                    trigger: ".id-final-sig",
+                    start: "top 85%",
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.5,
+                delay: 0.8,
+                ease: "power3.out"
+            });
+        }
+
+
+        // 5. INTERACTIVE COGNITION: COUNTER & MULTI-BURST CONFETTI
+        const rippleTrigger = document.getElementById("ripple-trigger");
+        const counterConsole = document.getElementById("counter-console");
+        const ticker = document.getElementById("ticker");
+        let counterInitialized = false;
+
+        rippleTrigger.addEventListener("click", () => {
+            // High-end multi-burst structural confetti configurations
+            const config1 = { particleCount: 100, spread: 60, origin: { y: 0.6 }, colors: ['#ffffff', '#FCD34D', '#A78BFA'] };
+            const config2 = { particleCount: 50, angle: 60, spread: 80, origin: { x: 0 }, colors: ['#ffffff', '#FCD34D'] };
+            const config3 = { particleCount: 50, angle: 120, spread: 80, origin: { x: 1 }, colors: ['#ffffff', '#A78BFA'] };
+            
+            confetti(config1);
+            setTimeout(() => confetti(config2), 150);
+            setTimeout(() => confetti(config3), 300);
+
+            // Container Shake Response
+            const shakeContainer = document.getElementById("shake-container");
+            shakeContainer.style.transform = "scale(0.99) translateY(4px)";
+            setTimeout(() => { shakeContainer.style.transform = "none"; }, 120);
+
+            if (!counterInitialized) {
+                counterInitialized = true;
+                counterConsole.classList.remove("opacity-0", "scale-95");
+                
+                // GSAP Linear Interpolator for Numeric Ticker
+                let trackingValue = { count: 0 };
+                gsap.to(trackingValue, {
+                    count: 2837282,
+                    duration: 3.5,
+                    ease: "power4.out",
+                    onUpdate: function() {
+                        ticker.innerHTML = Math.floor(trackingValue.count).toLocaleString();
+                    }
+                });
+            }
+        });
+
+
+        // 6. MODULAR DIGITAL ENVELOPE STRUCTURAL INTERACTION
+        const envelopeWrapper = document.getElementById("envelope-wrapper");
+        const letterNode = document.getElementById("letter-node");
+        const envelopePrompt = document.getElementById("envelope-prompt");
+        let isEnvelopeOpen = false;
+
+        envelopeWrapper.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (!isEnvelopeOpen) {
+                letterNode.style.top = "15%"; 
+                envelopeWrapper.style.height = "26rem"; 
+                envelopePrompt.style.opacity = "0";
+                isEnvelopeOpen = true;
+            } else {
+                letterNode.style.top = "100%";
+                envelopeWrapper.style.height = "16rem"; 
+                setTimeout(() => { envelopePrompt.style.opacity = "1"; }, 400);
+                isEnvelopeOpen = false;
+            }
+        });
+
+
+        // ==========================================
+        // 7. HIDDEN SUBTLE EASTER EGG MATRIX SYSTEM
+        // ==========================================
+
+        const toastEl = document.getElementById("easter-toast");
+        function triggerToast(message) {
+            toastEl.innerText = message;
+            toastEl.style.opacity = "1";
+            toastEl.style.transform = "translateY(0)";
+            setTimeout(() => {
+                toastEl.style.opacity = "0";
+                toastEl.style.transform = "translateY(20px)";
+            }, 4000);
+        }
+
+        // A. Title Seven-Clicks Matrix
+        const heroTitle = document.getElementById("hero-title");
+        let titleClicks = 0;
+        heroTitle.addEventListener("click", () => {
+            titleClicks++;
+            if (titleClicks === 7) {
+                triggerToast("404: Perfect Gift Not Found. Creating One Instead...");
+                confetti({ particleCount: 40, spread: 50, colors: ['#FCD34D'] });
+                titleClicks = 0;
+            }
+        });
+
+        // B. Konami Code Stream Detection
+        const targetSequence = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
+        let userSequenceIndex = 0;
+        document.addEventListener("keydown", (e) => {
+            if (e.key === targetSequence[userSequenceIndex]) {
+                userSequenceIndex++;
+                if (userSequenceIndex === targetSequence.length) {
+                    triggerToast("Developer Mode Activated. Confetti Storm Imminent.");
+                    const end = Date.now() + (2 * 1000);
+                    (function frameLoop() {
+                        confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                        if (Date.now() < end) { requestAnimationFrame(frameLoop); }
+                    }());
+                    userSequenceIndex = 0;
+                }
+            } else {
+                userSequenceIndex = 0;
+            }
+        });
+
+        // C. Background Dual-Click Spacial Ripple
+        document.body.addEventListener("dblclick", (e) => {
+            const ripple = document.createElement("div");
+            ripple.className = "ripple-effect";
+            // Coordinate calibration targeting centering metrics
+            const diameter = 120;
+            ripple.style.width = ripple.style.height = `${diameter}px`;
+            ripple.style.left = `${e.clientX - diameter / 2}px`;
+            ripple.style.top = `${e.clientY - diameter / 2}px`;
+            
+            document.body.appendChild(ripple);
+            setTimeout(() => { ripple.remove(); }, 1200);
+        });
+
+        // D. Wandering Duck Automation (Multiple Ducks)
+        const ducks = document.querySelectorAll(".easter-duck");
+        ducks.forEach((duck) => {
+            let duckX = -50;
+            const speed = parseFloat(duck.dataset.speed) || 0.5;
+            const initialDelay = parseInt(duck.dataset.delay) || 5000;
+
+            function routeWanderingDuck() {
+                duckX += speed;
+                duck.style.left = `${duckX}px`;
+                duck.style.transform = `translateY(${Math.sin(duckX / 20) * 15}px)`;
+
+                if (duckX > window.innerWidth + 50) {
+                    duckX = -50;
+                    setTimeout(routeWanderingDuck, 8000 + Math.random() * 8000);
+                } else {
+                    requestAnimationFrame(routeWanderingDuck);
+                }
+            }
+            setTimeout(routeWanderingDuck, initialDelay);
+
+            duck.addEventListener("click", () => {
+                triggerToast("Quack. You found the structural overthinking duck.");
+                confetti({ particleCount: 15, spread: 30, origin: { x: duckX / window.innerWidth, y: 0.8 } });
+            });
+        });
+
+        // E. Waffle Kinetic Rotation
+        const waffleCard = document.querySelector(".id-waffle-icon");
+        waffleCard.addEventListener("mouseenter", () => {
+            gsap.to(waffleCard, { rotate: 360, duration: 0.8, ease: "power4.out" });
+        });
+        waffleCard.addEventListener("mouseleave", () => {
+            gsap.to(waffleCard, { rotate: 0, duration: 0.6, ease: "power2.out" });
+        });
+
+    </script>
+</body>
+</html>
